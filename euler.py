@@ -30,6 +30,11 @@ class Connection:
         self.weights = weights
         self.delay = delay
 
+class SlowConnection(Connection):
+    def __init__(self, sourceNode, targetNode, weights, decay, delay = 0):
+        super().__init__(sourceNode, targetNode, weights, delay)
+        self.decay = decay
+
 class Node():
     def __init__(self, name, n_neurons):
         self.n_neurons = n_neurons
@@ -104,8 +109,8 @@ class SinusoidalCurrentInput(CurrentInput):
         t = np.arange(0, steps) * timestep
         self.x = self.amplitudes * np.sin(2*np.pi * self.omega * t)
         self.xdot = self.amplitudes * 2*np.pi * self.omega * np.cos(2*np.pi * self.omega * t)
-        print(self.x)
-        self.I = self.x + self.xdot
+        print(max(self.x))
+        self.I = self.x + 10*self.xdot #!!! 10 is 1/leak !!! IMPLEMENT BETTER
 
 class GaussianCurrentInput(CurrentInput):
     def __init__(self, n_neurons, mean, covariance):
@@ -128,6 +133,8 @@ class Population(Node):
         super().__init__(name, n_neurons)
         self.leak = leak
         self.noise = noise
+        self.regL1 = 0
+        self.regL2 = 0
         self.Vt = np.zeros((self.n_neurons))
         self.Vm = np.zeros((self.n_neurons, 1))
         self.output = np.array([])
