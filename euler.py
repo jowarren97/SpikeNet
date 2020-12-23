@@ -57,7 +57,9 @@ class Node():
             indexed_train = [(idx+1) * spike for spike in spiketrain]
             ax.plot(t, indexed_train,
                     #  np.ones_like(spiketrain) * i,
-                    'k.', **options)
+                    'k.', markersize = 2)
+                    #'k.', **options)
+
         ax.set_ylabel("Neuron index")
         ax.set_ylim(-0.5 + min_index, max_index + 0.5)
 
@@ -129,13 +131,14 @@ class GaussianCurrentInput(CurrentInput):
         #self.I = #WRITE CODE
 
 class Population(Node):
-    def __init__(self, name = 'pop', n_neurons = 1, leak = 0.1, noise = 5):
+    def __init__(self, name = 'pop', n_neurons = 1, leak = 0.1, noise = 0.1):
         super().__init__(name, n_neurons)
         self.leak = leak
         self.noise = noise
-        self.regL1 = 0
-        self.regL2 = 0
-        self.Vt = np.zeros((self.n_neurons))
+        self.regL1 = 0.1
+        self.regL2 = 0.1
+        self.plasticThreshold = True
+        self.Vt = np.zeros((self.n_neurons, 1))
         self.Vm = np.zeros((self.n_neurons, 1))
         self.output = np.array([])
         self.connections = dict()
@@ -144,7 +147,7 @@ class Population(Node):
     def initialise(self, steps, timestep = None):
         self.Vm = np.zeros((self.n_neurons, steps))
         self.spiketrains = np.zeros((self.n_neurons, steps))
-        self.Vt = np.zeros((self.n_neurons, 1))
+        self.Vt = np.zeros((self.n_neurons, steps))
 
         if 'output' in self.connections:
             outputdim = self.output.shape[0]
@@ -154,7 +157,9 @@ class Population(Node):
 
         r = self.connections['input'].weights
         for i in range(0, self.n_neurons):
-            self.Vt[i] = 0.5*np.dot(r[:,i], r[:,i].T) 
+            self.Vt[i,0] = 0.5 * (np.dot(r[:,i], r[:,i].T) + self.regL1*self.leak + self.regL2*self.leak**2)
+        
+        print(self.Vt[:,[0]])
 
     def addConnection(self, node, weights, delay = 0):
         if weights.shape != (node.n_neurons, self.n_neurons):
@@ -184,7 +189,7 @@ class Population(Node):
 
     def propagate(self, step, timestep, oneSpikePerStep):
         #leak
-        self.Vm[:,[step]] = self.Vm[:,[step-1]] - timestep * self.leak * (self.Vm[:,[step-1]] + np.random.normal(0, self.noise * self.Vt, (self.n_neurons,1)))
+        self.Vm[:,[step]] = self.Vm[:,[step-1]] - timestep * self.leak * (self.Vm[:,[step-1]] + np.random.normal(0, self.noise * self.Vt[:,[0]], (self.n_neurons,1)))
 
         for _, proj in self.connections.items():
             node = proj.source
@@ -195,29 +200,72 @@ class Population(Node):
             elif type(node) == Population:
                 self.Vm[:,[step]] += weight @ node.spiketrains[:,[step-1]]
 
+        if self.plasticThreshold:
+            self.Vt[:,[step]] = self.Vt[:,[step-1]] + timestep * self.leak * ( - (self.Vt[:,[step-1]] - self.Vt[:,[0]]) + self.regL2 * self.leak * self.spiketrains[:,[step-1]])
+        else:
+            self.Vt[:,[step]] = self.Vt[:,[step-1]]
+
         if oneSpikePerStep:
-            VaboveThresh = self.Vm[:,[step]] - self.Vt
+            VaboveThresh = self.Vm[:,[step]] - self.Vt[:,[step]]
             if np.amax(VaboveThresh) < 0:
                 pass
             else:
                 idx = np.argmax(VaboveThresh)
-                self.spiketrains[idx,[step]] = 1   
+                self.spiketrains[idx,[step]] = 1
+
+        #GETS STUCK IN INFINITE OSCILLATORY LOOP
+        # if oneSpikePerStep:
+        #     VaboveThresh = self.Vm[:,[step]] - self.Vt[:,[step]]
+
+        #     while np.amax(VaboveThresh) > 0:
+        #         idx = np.argmax(VaboveThresh)
+        #         print("idx: ", idx, "\tVaboveThresh[idx]: ", VaboveThresh[idx])
+        #         self.spiketrains[idx,[step]] = 1
+
+        #         for _, proj in self.connections.items():
+        #             if proj.source == self:
+        #                 print(VaboveThresh)
+        #                 VaboveThresh += proj.weights[:,[idx]]
+        #                 print(VaboveThresh)
+
         else:
             self.spiketrains[:,[step]] = np.greater(self.Vm[:,[step]], self.Vt)
 
         if 'output' in self.connections:
             self.output[:,[step]] = self.output[:,[step-1]] + self.connections['output'].weights @ self.spiketrains[:,[step]] + timestep * (-self.leak * self.output[:,[step-1]])
 
+    def getISIplot(self, timestep = 0.01, ax = None):
+        ax = ax or plt.gca()
+
+        intervals = []
+
+        for spiketrain in self.spiketrains:
+            print(spiketrain)
+            spiketimes = np.dot(np.where(spiketrain == 1), timestep)[0]
+            print(spiketimes)
+
+            prevSpiketime = spiketimes[0]
+            for nextSpiketime in spiketimes[1:]:
+                intervals += [nextSpiketime - prevSpiketime]
+                prevSpiketime = nextSpiketime
+
+        print(intervals)
+
+        ax.hist(intervals, density=True, bins=100)
+
+
 class DataProcessor:
     def __init__(self):
         self.populations = []
+
+    
 
 class Simulation:
     def __init__(self):
         self.populations = []
         self.inputs = []
         self.step = 1
-        self.timestep = 0.1
+        self.timestep = 0.01
         self.duration = 10
         self.steps = int(self.duration/self.timestep)
         #self.data = DataProcessor()
@@ -257,12 +305,12 @@ class Simulation:
         while self.step < self.steps:
             self.propagate()
 
-T = 200
+T = 100
 
-pop = Population(name = 'pop', n_neurons = 2)
-inp = SinusoidalCurrentInput(n_neurons = 1, amplitudes = [2.0], angularVelocity=1/50)
+pop = Population(name = 'pop', n_neurons = 100)
+inp = SinusoidalCurrentInput(n_neurons = 1, amplitudes = [10.0], angularVelocity=1/50)
 
-r = np.array([[0.1],[-0.1]]).T
+r = np.array(50*[[0.1]]+50*[[-0.1]]).T
 pop.addConnection(node = inp, weights = r)
 
 w = r.T @ r
@@ -280,7 +328,7 @@ print("done simulation")
 # n_neurons = 10
 # timestep = 0.1 #ms
 # duration = 50
-t = np.arange(0, T, 0.1)
+t = np.arange(0, T, 0.01)
 # leak = 0.1
 # input = np.array([[1.0]])
 
@@ -316,19 +364,26 @@ t = np.arange(0, T, 0.1)
 
 fig = plt.figure()
 for signal in pop.output:  
-    ax = fig.add_subplot(311)
+    ax = fig.add_subplot(322)
     ax.set_xlim(0, t[-1])
     ax.plot(t, signal)
     ax.set_ylabel("value")
 
-for v in pop.Vm:
-    ax2 = fig.add_subplot(312)
+for v in pop.Vm[:1]:
+    ax2 = fig.add_subplot(324)
     ax2.set_xlim(0, t[-1])
     ax2.plot(t, v)
     ax2.set_xlabel("time /ms")
     ax2.set_ylabel("Vm")
 
-ax3 = fig.add_subplot(313)
+for T in pop.Vt:
+    ax2.plot(t, T, '--')
+
+ax3 = fig.add_subplot(326)
 pop.plotSpiketrains(ax3, t)
+
+ax4 = fig.add_subplot(122)
+
+pop.getISIplot(ax=ax4)
 
 plt.show()
