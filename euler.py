@@ -1,27 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from graphing import plotISI
+import graphing
 #from pyNN.utility.plotting import plot_spiketrains
-
-def handle_options(ax, options):
-    if "xticks" not in options or options.pop("xticks") is False:
-        plt.setp(ax.get_xticklabels(), visible=False)
-    if "xlabel" in options:
-        ax.set_xlabel(options.pop("xlabel"))
-    if "yticks" not in options or options.pop("yticks") is False:
-        plt.setp(ax.get_yticklabels(), visible=False)
-    if "ylabel" in options:
-        ax.set_ylabel(options.pop("ylabel"))
-    if "ylim" in options:
-        ax.set_ylim(options.pop("ylim"))
-    if "xlim" in options:
-        ax.set_xlim(options.pop("xlim"))
-
-
-    # if label:
-    #     plt.text(0.95, 0.95, label,
-    #              transform=ax.transAxes, ha='right', va='top',
-    #              bbox=dict(facecolor='white', alpha=1.0))
 
 class Connection:
     def __init__(self, sourceNode, targetNode, weights, delay = 0):
@@ -96,7 +76,6 @@ class SinusoidalCurrentInput(CurrentInput):
         t = np.arange(0, steps) * timestep
         self.x = self.amplitudes * np.sin(2*np.pi * self.omega * t)
         self.xdot = self.amplitudes * 2*np.pi * self.omega * np.cos(2*np.pi * self.omega * t)
-        print(max(self.x))
         self.I = self.x + 10*self.xdot #!!! 10 is 1/leak !!! IMPLEMENT BETTER
 
 class GaussianCurrentInput(CurrentInput):
@@ -144,8 +123,6 @@ class Population(Node):
         for i in range(0, self.n_neurons):
             self.Vt[i,0] = 0.5 * (np.dot(r[:,i], r[:,i].T) + self.regL1*self.leak + self.regL2*self.leak**2)
         
-        print(self.Vt[:,[0]])
-
     def addConnection(self, node, weights, delay = 0):
         if weights.shape != (node.n_neurons, self.n_neurons):
             raise ValueError("Passed array is not of the right shape")
@@ -274,7 +251,7 @@ class Simulation:
 T = 100
 
 pop = Population(name = 'pop', n_neurons = 100)
-inp = SinusoidalCurrentInput(n_neurons = 1, amplitudes = [10.0], angularVelocity=1/50)
+inp = SinusoidalCurrentInput(n_neurons = 1, amplitudes = [5.0], angularVelocity=1/50)
 
 r = np.array(50*[[0.1]]+50*[[-0.1]]).T
 pop.addConnection(node = inp, weights = r)
@@ -291,53 +268,15 @@ sim.run(duration = T)
 
 print("done simulation")
 
-# n_neurons = 10
-# timestep = 0.1 #ms
-# duration = 50
 t = np.arange(0, T, 0.01)
-# leak = 0.1
-# input = np.array([[1.0]])
-
-# steps = int(duration/timestep)
-
-# Vm = np.zeros((n_neurons, steps))
-# spike_trains = np.zeros((n_neurons, steps))
-# V_thresh = np.zeros((n_neurons, 1))
-# output = np.zeros((input.shape[0], steps))
-
-# r = np.array(n_neurons*[[0.1]]).T
-# w = np.matmul(r.T, r)
-# print("decoding weights r = ", r, "\n")
-# print("lateral weights w = ", w, "\n")
-
-# for i in range(0, n_neurons):
-#     V_thresh[i] = 0.5*np.dot(r[:,i], r[:,i].T)
-# print("threshold T = ", V_thresh, "\n")
-
-
-# step = 1
-# while step < steps:
-
-#     Vm[:,[step]] = Vm[:,[step-1]] - w @ spike_trains[:,[step-1]] + timestep * leak * (r.T @ input - Vm[:,[step-1]] + np.random.normal(0, 10*V_thresh, (n_neurons,1)))
-    
-#     spike_trains[:,[step]] = np.greater(Vm[:,[step]], V_thresh)
-
-#     output[:,[step]] = output[:,[step-1]] + r @ spike_trains[:,[step]] + timestep * (-leak * output[:,[step-1]])
-
-#     step += 1
-#     print(step)
-
 
 fig = plt.figure()
 
-for signal in pop.output:  
-    ax = fig.add_subplot(321)
-    ax.set_xlim(0, t[-1])
-    ax.plot(t, signal)
-    ax.set_ylabel("value")
+ax = fig.add_subplot(321)
+graphing.plotOutputInput(inp.x, pop.output, t, ax)
 
+ax2 = fig.add_subplot(323)
 for v in pop.Vm[:1]:
-    ax2 = fig.add_subplot(323)
     ax2.set_xlim(0, t[-1])
     ax2.plot(t, v)
     ax2.set_xlabel("time /ms")
@@ -352,4 +291,5 @@ graphing.plotSpiketrains(pop, ax3, t)
 ax4 = fig.add_subplot(122)
 graphing.plotISI(pop, ax=ax4)
 
+plt.tight_layout()
 plt.show()
