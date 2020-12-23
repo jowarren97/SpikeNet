@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from abc import ABC, abstractmethod
+from graphing import plotISI
 #from pyNN.utility.plotting import plot_spiketrains
 
 def handle_options(ax, options):
@@ -47,21 +47,6 @@ class Node():
    # @abstractmethod
     def propagate(self, steps):
         pass
-
-    def plotSpiketrains(self, ax, t, **options):
-        ax.set_xlim(0, t[-1])
-        #handle_options(ax, options)
-        max_index = self.spiketrains.shape[0]
-        min_index = 1
-        for idx, spiketrain in enumerate(self.spiketrains):
-            indexed_train = [(idx+1) * spike for spike in spiketrain]
-            ax.plot(t, indexed_train,
-                    #  np.ones_like(spiketrain) * i,
-                    'k.', markersize = 2)
-                    #'k.', **options)
-
-        ax.set_ylabel("Neuron index")
-        ax.set_ylim(-0.5 + min_index, max_index + 0.5)
 
 # class Input(Node):
 #     def __init__(self, n_neurons):
@@ -234,25 +219,6 @@ class Population(Node):
         if 'output' in self.connections:
             self.output[:,[step]] = self.output[:,[step-1]] + self.connections['output'].weights @ self.spiketrains[:,[step]] + timestep * (-self.leak * self.output[:,[step-1]])
 
-    def getISIplot(self, timestep = 0.01, ax = None):
-        ax = ax or plt.gca()
-
-        intervals = []
-
-        for spiketrain in self.spiketrains:
-            print(spiketrain)
-            spiketimes = np.dot(np.where(spiketrain == 1), timestep)[0]
-            print(spiketimes)
-
-            prevSpiketime = spiketimes[0]
-            for nextSpiketime in spiketimes[1:]:
-                intervals += [nextSpiketime - prevSpiketime]
-                prevSpiketime = nextSpiketime
-
-        print(intervals)
-
-        ax.hist(intervals, density=True, bins=100)
-
 
 class DataProcessor:
     def __init__(self):
@@ -363,14 +329,15 @@ t = np.arange(0, T, 0.01)
 
 
 fig = plt.figure()
+
 for signal in pop.output:  
-    ax = fig.add_subplot(322)
+    ax = fig.add_subplot(321)
     ax.set_xlim(0, t[-1])
     ax.plot(t, signal)
     ax.set_ylabel("value")
 
 for v in pop.Vm[:1]:
-    ax2 = fig.add_subplot(324)
+    ax2 = fig.add_subplot(323)
     ax2.set_xlim(0, t[-1])
     ax2.plot(t, v)
     ax2.set_xlabel("time /ms")
@@ -379,11 +346,10 @@ for v in pop.Vm[:1]:
 for T in pop.Vt:
     ax2.plot(t, T, '--')
 
-ax3 = fig.add_subplot(326)
-pop.plotSpiketrains(ax3, t)
+ax3 = fig.add_subplot(325)
+graphing.plotSpiketrains(pop, ax3, t)
 
 ax4 = fig.add_subplot(122)
-
-pop.getISIplot(ax=ax4)
+graphing.plotISI(pop, ax=ax4)
 
 plt.show()
