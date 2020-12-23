@@ -10,10 +10,23 @@ class Connection:
         self.weights = weights
         self.delay = delay
 
-class SlowConnection(Connection):
-    def __init__(self, sourceNode, targetNode, weights, decay, delay = 0):
-        super().__init__(sourceNode, targetNode, weights, delay)
-        self.decay = decay
+    def __add__(self, other):
+        if type(self) != type(other):
+            raise TypeError("Cannot add an object of type", type(self), "to an object of type", type(other))
+        if (self.source, self.target, self.delay) != (other.source, other.target, other.delay):
+            raise ValueError("Parameters of connections do not allow addition.")
+
+        newWeights = self.weights + other.weights
+        newConnection = Connection(self.source, self.target, newWeights, self.delay)
+        return newConnection
+
+
+# class SlowConnection(Connection):
+#     def __init__(self, sourceNode, targetNode, weights, decay, precision = 0.0001, delay = 0):
+#         super().__init__(sourceNode, targetNode, weights, delay)
+#         self.decay = decay
+#         self.precision = precision
+#         self.psp = np.empty([])        
 
 class Node():
     def __init__(self, name, n_neurons):
@@ -99,61 +112,87 @@ class Population(Node):
         super().__init__(name, n_neurons)
         self.leak = leak
         self.noise = noise
-        self.regL1 = 0.1
-        self.regL2 = 0.1
-        self.plasticThreshold = True
+        self.regL1 = 0.01
+        self.regL2 = 0.001
+        self.adaptiveThreshold = False
         self.Vt = np.zeros((self.n_neurons, 1))
         self.Vm = np.zeros((self.n_neurons, 1))
+        self.rate = np.zeros((self.n_neurons, 1))
         self.output = np.array([])
-        self.connections = dict()
+        self.fastConnections = dict()
+        self.slowConnections = dict()
         self.outputConnections = dict()
+        self.learningEnabled = False
 
     def initialise(self, steps, timestep = None):
+        #Initialise timeseries arrays of data (membrane V, spiketrains, threshold voltage, rates, output)
         self.Vm = np.zeros((self.n_neurons, steps))
         self.spiketrains = np.zeros((self.n_neurons, steps))
         self.Vt = np.zeros((self.n_neurons, steps))
-
-        if 'output' in self.connections:
+        self.rate = np.zeros((self.n_neurons, steps))
+        if 'output' in self.fastConnections:
             outputdim = self.output.shape[0]
             self.output = np.zeros((outputdim, steps))
         else:
             print("Warning: no output has been added to the population")
 
-        r = self.connections['input'].weights
+        #Initialise initial value for threshold voltage
+        r = self.fastConnections['input'].weights
         for i in range(0, self.n_neurons):
             self.Vt[i,0] = 0.5 * (np.dot(r[:,i], r[:,i].T) + self.regL1*self.leak + self.regL2*self.leak**2)
-        
-    def addConnection(self, node, weights, delay = 0):
+
+        #Add recurrent connections that implement L1 & L2 regularisation on firing rates (Boerlin 2013)
+        if not self.adaptiveThreshold:
+            print(self.fastConnections['pop'].weights)
+            self.addReccurence(weights = - self.regL2 * self.leak**2 * np.eye(self.n_neurons), connType='fast')
+            print((self.fastConnections['pop']).weights)
+            #print((self.slowConnections['pop']).weights)
+            #self.addReccurence(weights = self.leak * np.eye(self.n_neurons) @ (self.fastConnections['pop']).weights, connType='slow')
+            #print((self.slowConnections['pop']).weights)
+
+    def addConnection(self, node, weights, connType = 'fast', delay = 0):
         if weights.shape != (node.n_neurons, self.n_neurons):
             raise ValueError("Passed array is not of the right shape")
 
         proj = Connection(node, self, weights, delay)
-        self.connections[node.name] = proj
+        if connType == 'fast':
+            if node.name in self.fastConnections: #check if already existing connection
+                print(self.fastConnections[node.name].weights)
+                self.fastConnections[node.name] += proj
+                print(self.fastConnections[node.name].weights)
+                print("Warning: adding provided weight matrix to existing connection.")
+            else:
+                self.fastConnections[node.name] = proj
+        elif connType == 'slow':
+            if node.name in self.slowConnections: #check if already existing connection
+                self.slowConnections[node.name] += proj
+                print("Warning: adding provided weight matrix to existing connection.")
+            else:
+                self.slowConnections[node.name] = proj
+        else:
+            print("Unsuccessfully addition of connection from", node.name, "node to", self.name, "node. Please specify connection type either 'fast' or 'slow'.")
+            return
+        
         print("Successfully added connection from", node.name, "node to", self.name, "node.")
 
-    def addReccurence(self, weights, delay = 0):
-        if weights.shape != (self.n_neurons, self.n_neurons):
-            raise ValueError("Passed array is not of the right shape")
-
-        proj = Connection(self, self, weights, delay)
-        self.connections[self.name] = proj 
-        print("Successfully added connection from", self.name, "node to", self.name, "node.")
+    def addReccurence(self, weights, connType = 'fast', delay = 0):
+        self.addConnection(self, weights, connType, delay)
 
     def addOutput(self, weights, outputdim = 1):
         if weights.shape != (outputdim, self.n_neurons):
             raise ValueError("Passed array is not of the right shape")
 
         proj = Connection(None, None, weights)
-        self.connections['output'] = proj
+        self.fastConnections['output'] = proj
         self.output = np.zeros((outputdim, 1))
         print("Successfully added output from", self.name)
 
-
     def propagate(self, step, timestep, oneSpikePerStep):
-        #leak
+        #LEAK MEMBRANE VOLTAGE
         self.Vm[:,[step]] = self.Vm[:,[step-1]] - timestep * self.leak * (self.Vm[:,[step-1]] + np.random.normal(0, self.noise * self.Vt[:,[0]], (self.n_neurons,1)))
 
-        for _, proj in self.connections.items():
+        #PROCESS FAST CURRENTS
+        for _, proj in self.fastConnections.items():
             node = proj.source
             weight = proj.weights
             delay = proj.delay
@@ -162,7 +201,16 @@ class Population(Node):
             elif type(node) == Population:
                 self.Vm[:,[step]] += weight @ node.spiketrains[:,[step-1]]
 
-        if self.plasticThreshold:
+        #PROCESS SLOW CURRENTS
+        for _, proj in self.slowConnections.items():
+            print('doing slow current')
+            node = proj.source
+            weight = proj.weights
+            delay = proj.delay
+            self.Vm[:,[step]] += (1/self.leak) * weight @ node.rate[:,[step-1]]        
+
+        #ADAPTIVE THRESHOLD
+        if self.adaptiveThreshold: #DOESNT SEEM TO BE WORKING?
             self.Vt[:,[step]] = self.Vt[:,[step-1]] + timestep * self.leak * ( - (self.Vt[:,[step-1]] - self.Vt[:,[0]]) + self.regL2 * self.leak * self.spiketrains[:,[step-1]])
         else:
             self.Vt[:,[step]] = self.Vt[:,[step-1]]
@@ -184,7 +232,7 @@ class Population(Node):
         #         print("idx: ", idx, "\tVaboveThresh[idx]: ", VaboveThresh[idx])
         #         self.spiketrains[idx,[step]] = 1
 
-        #         for _, proj in self.connections.items():
+        #         for _, proj in self.fastConnections.items():
         #             if proj.source == self:
         #                 print(VaboveThresh)
         #                 VaboveThresh += proj.weights[:,[idx]]
@@ -193,15 +241,13 @@ class Population(Node):
         else:
             self.spiketrains[:,[step]] = np.greater(self.Vm[:,[step]], self.Vt)
 
-        if 'output' in self.connections:
-            self.output[:,[step]] = self.output[:,[step-1]] + self.connections['output'].weights @ self.spiketrains[:,[step]] + timestep * (-self.leak * self.output[:,[step-1]])
+        #UPDATE RATES
+        self.rate[:,[step]] = (1 - self.leak * timestep) * self.rate[:,[step-1]] + self.leak * self.spiketrains[:,[step]]
 
+        #UPDATE OUTPUTS
+        if 'output' in self.fastConnections:
+            self.output[:,[step]] = self.output[:,[step-1]] + self.fastConnections['output'].weights @ self.spiketrains[:,[step]] + timestep * (-self.leak * self.output[:,[step-1]])
 
-class DataProcessor:
-    def __init__(self):
-        self.populations = []
-
-    
 
 class Simulation:
     def __init__(self):
@@ -211,7 +257,6 @@ class Simulation:
         self.timestep = 0.01
         self.duration = 10
         self.steps = int(self.duration/self.timestep)
-        #self.data = DataProcessor()
         self.oneSpikePerStep = True
 
     def addPopulations(self, populations):
