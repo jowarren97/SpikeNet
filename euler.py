@@ -112,8 +112,8 @@ class Population(Node):
         super().__init__(name, n_neurons)
         self.leak = leak
         self.noise = noise
-        self.regL1 = 0.01
-        self.regL2 = 0.001
+        self.regL1 = 0.001
+        self.regL2 = 0.0001
         self.adaptiveThreshold = False
         self.Vt = np.zeros((self.n_neurons, 1))
         self.Vm = np.zeros((self.n_neurons, 1))
@@ -143,9 +143,7 @@ class Population(Node):
 
         #Add recurrent connections that implement L1 & L2 regularisation on firing rates (Boerlin 2013)
         if not self.adaptiveThreshold:
-            print(self.fastConnections['pop'].weights)
             self.addReccurence(weights = - self.regL2 * self.leak**2 * np.eye(self.n_neurons), connType='fast')
-            print((self.fastConnections['pop']).weights)
             #print((self.slowConnections['pop']).weights)
             #self.addReccurence(weights = self.leak * np.eye(self.n_neurons) @ (self.fastConnections['pop']).weights, connType='slow')
             #print((self.slowConnections['pop']).weights)
@@ -157,9 +155,7 @@ class Population(Node):
         proj = Connection(node, self, weights, delay)
         if connType == 'fast':
             if node.name in self.fastConnections: #check if already existing connection
-                print(self.fastConnections[node.name].weights)
                 self.fastConnections[node.name] += proj
-                print(self.fastConnections[node.name].weights)
                 print("Warning: adding provided weight matrix to existing connection.")
             else:
                 self.fastConnections[node.name] = proj
@@ -203,7 +199,6 @@ class Population(Node):
 
         #PROCESS SLOW CURRENTS
         for _, proj in self.slowConnections.items():
-            print('doing slow current')
             node = proj.source
             weight = proj.weights
             delay = proj.delay
@@ -211,7 +206,7 @@ class Population(Node):
 
         #ADAPTIVE THRESHOLD
         if self.adaptiveThreshold: #DOESNT SEEM TO BE WORKING?
-            self.Vt[:,[step]] = self.Vt[:,[step-1]] + timestep * self.leak * ( - (self.Vt[:,[step-1]] - self.Vt[:,[0]]) + self.regL2 * self.leak * self.spiketrains[:,[step-1]])
+            self.Vt[:,[step]] = self.Vt[:,[step-1]] - timestep * self.leak * (self.Vt[:,[step-1]] - self.Vt[:,[0]]) + self.regL2 * self.leak**2 * self.spiketrains[:,[step-1]]
         else:
             self.Vt[:,[step]] = self.Vt[:,[step-1]]
 
@@ -223,6 +218,12 @@ class Population(Node):
                 idx = np.argmax(VaboveThresh)
                 self.spiketrains[idx,[step]] = 1
 
+                # w = self.fastConnections[self.name].weights[:,[idx]]
+                # e = 0.1
+                # b = 0.1
+                # wnew = w - e*(b*(self.Vm[:,[step-1]] + self.regL2*self.rate[:,[step-1]]) + w)
+                # wnew[idx] = wnew[idx] - e*self.regL2
+                # self.fastConnections[self.name].weights[:,[idx]] = wnew
         #GETS STUCK IN INFINITE OSCILLATORY LOOP
         # if oneSpikePerStep:
         #     VaboveThresh = self.Vm[:,[step]] - self.Vt[:,[step]]
@@ -242,11 +243,13 @@ class Population(Node):
             self.spiketrains[:,[step]] = np.greater(self.Vm[:,[step]], self.Vt)
 
         #UPDATE RATES
-        self.rate[:,[step]] = (1 - self.leak * timestep) * self.rate[:,[step-1]] + self.leak * self.spiketrains[:,[step]]
+        self.rate[:,[step]] = (1 - self.leak * timestep) * self.rate[:,[step-1]] + self.spiketrains[:,[step]]
 
         #UPDATE OUTPUTS
         if 'output' in self.fastConnections:
             self.output[:,[step]] = self.output[:,[step-1]] + self.fastConnections['output'].weights @ self.spiketrains[:,[step]] + timestep * (-self.leak * self.output[:,[step-1]])
+
+
 
 
 class Simulation:
@@ -293,7 +296,7 @@ class Simulation:
         while self.step < self.steps:
             self.propagate()
 
-T = 100
+T = 200
 
 pop = Population(name = 'pop', n_neurons = 100)
 inp = SinusoidalCurrentInput(n_neurons = 1, amplitudes = [5.0], angularVelocity=1/50)
