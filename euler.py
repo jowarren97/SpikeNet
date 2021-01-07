@@ -4,11 +4,13 @@ import graphing
 #from pyNN.utility.plotting import plot_spiketrains
 
 class Connection:
-    def __init__(self, sourceNode, targetNode, weights, delay = 0):
+    def __init__(self, sourceNode, targetNode, weights, delay = 0, logWeights = False):
         self.source = sourceNode
         self.target = targetNode
         self.weights = weights
         self.delay = delay
+        self.logWeights = logWeights
+        self.weightHistory = [[],[]]
 
     def __add__(self, other):
         if type(self) != type(other):
@@ -16,9 +18,16 @@ class Connection:
         if (self.source, self.target, self.delay) != (other.source, other.target, other.delay):
             raise ValueError("Parameters of connections do not allow addition.")
 
+        if self.logWeights == True or other.logWeights == True:
+            newLogWeights = True
+
         newWeights = self.weights + other.weights
-        newConnection = Connection(self.source, self.target, newWeights, self.delay)
+        newConnection = Connection(self.source, self.target, newWeights, self.delay, newLogWeights)
         return newConnection
+
+    def recordWeights(self, t):
+        self.weightHistory[0] += [t]
+        self.weightHistory[1] += [self.weights]
 
 
 # class SlowConnection(Connection):
@@ -112,8 +121,8 @@ class Population(Node):
         super().__init__(name, n_neurons)
         self.leak = leak
         self.noise = noise
-        self.regL1 = 0.001
-        self.regL2 = 0.0001
+        self.regL1 = 0.0
+        self.regL2 = 0.01
         self.adaptiveThreshold = False
         self.Vt = np.zeros((self.n_neurons, 1))
         self.Vm = np.zeros((self.n_neurons, 1))
@@ -148,11 +157,11 @@ class Population(Node):
             #self.addReccurence(weights = self.leak * np.eye(self.n_neurons) @ (self.fastConnections['pop']).weights, connType='slow')
             #print((self.slowConnections['pop']).weights)
 
-    def addConnection(self, node, weights, connType = 'fast', delay = 0):
+    def addConnection(self, node, weights, connType = 'fast', delay = 0, logWeights = False):
         if weights.shape != (node.n_neurons, self.n_neurons):
             raise ValueError("Passed array is not of the right shape")
 
-        proj = Connection(node, self, weights, delay)
+        proj = Connection(node, self, weights, delay, logWeights)
         if connType == 'fast':
             if node.name in self.fastConnections: #check if already existing connection
                 self.fastConnections[node.name] += proj
@@ -171,8 +180,8 @@ class Population(Node):
         
         print("Successfully added connection from", node.name, "node to", self.name, "node.")
 
-    def addReccurence(self, weights, connType = 'fast', delay = 0):
-        self.addConnection(self, weights, connType, delay)
+    def addReccurence(self, weights, connType = 'fast', delay = 0, logWeights = False):
+        self.addConnection(self, weights, connType, delay, logWeights)
 
     def addOutput(self, weights, outputdim = 1):
         if weights.shape != (outputdim, self.n_neurons):
@@ -182,6 +191,14 @@ class Population(Node):
         self.fastConnections['output'] = proj
         self.output = np.zeros((outputdim, 1))
         print("Successfully added output from", self.name)
+
+    def logWeights(self, step):
+        for _, proj in self.fastConnections.items():
+            if proj.logWeights == True:
+                proj.recordWeights(step)
+        for _, proj in self.slowConnections.items():
+            if proj.logWeights == True:
+                proj.recordWeights(step)
 
     def propagate(self, step, timestep, oneSpikePerStep):
         #LEAK MEMBRANE VOLTAGE
@@ -218,12 +235,13 @@ class Population(Node):
                 idx = np.argmax(VaboveThresh)
                 self.spiketrains[idx,[step]] = 1
 
-                # w = self.fastConnections[self.name].weights[:,[idx]]
-                # e = 0.1
-                # b = 0.1
-                # wnew = w - e*(b*(self.Vm[:,[step-1]] + self.regL2*self.rate[:,[step-1]]) + w)
-                # wnew[idx] = wnew[idx] - e*self.regL2
-                # self.fastConnections[self.name].weights[:,[idx]] = wnew
+                w = self.fastConnections[self.name].weights[:,[idx]]
+                lr = 0.02
+                beta = 1/0.9 #WHY BETA
+                dw = - 2*(self.Vm[:,[step]] + self.regL2*self.rate[:,[step-1]]) - w - self.regL2*self.spiketrains[:,[step]]
+                w = w + lr*dw
+                self.fastConnections[self.name].weights[:,[idx]] = w
+
         #GETS STUCK IN INFINITE OSCILLATORY LOOP
         # if oneSpikePerStep:
         #     VaboveThresh = self.Vm[:,[step]] - self.Vt[:,[step]]
@@ -249,6 +267,8 @@ class Population(Node):
         if 'output' in self.fastConnections:
             self.output[:,[step]] = self.output[:,[step-1]] + self.fastConnections['output'].weights @ self.spiketrains[:,[step]] + timestep * (-self.leak * self.output[:,[step-1]])
 
+        if step % 100:
+            self.logWeights(step)
 
 
 
@@ -257,7 +277,7 @@ class Simulation:
         self.populations = []
         self.inputs = []
         self.step = 1
-        self.timestep = 0.01
+        self.timestep = 0.1
         self.duration = 10
         self.steps = int(self.duration/self.timestep)
         self.oneSpikePerStep = True
@@ -296,16 +316,18 @@ class Simulation:
         while self.step < self.steps:
             self.propagate()
 
-T = 200
+T = 2000
+N = 100
+pop = Population(name = 'pop', n_neurons = N)
+inp = SinusoidalCurrentInput(n_neurons = 1, amplitudes = [2.0], angularVelocity=1/50)
 
-pop = Population(name = 'pop', n_neurons = 100)
-inp = SinusoidalCurrentInput(n_neurons = 1, amplitudes = [5.0], angularVelocity=1/50)
-
-r = np.array(50*[[0.1]]+50*[[-0.1]]).T
+r = np.array(int(N/2)*[[0.1]]+int(N/2)*[[-0.1]]).T
 pop.addConnection(node = inp, weights = r)
 
-w = r.T @ r
-pop.addReccurence(weights = -w)
+w = - r.T @ r
+#pop.addReccurence(weights = w)
+w_rand = - 0.001*np.random.rand(N,N) - 0.005*np.eye(N,N)
+pop.addReccurence(weights = w_rand, logWeights=True)
 pop.addOutput(r, 1)
 
 sim = Simulation()
@@ -316,8 +338,9 @@ sim.run(duration = T)
 
 print("done simulation")
 
-t = np.arange(0, T, 0.01)
-
+t = np.arange(0, T, 0.1)
+#plt.figure()
+#plt.plot(pop.fastConnections[pop.name].weightHistory[0,:], pop.fastConnections[pop.name].weightHistory[1])
 fig = plt.figure()
 
 ax = fig.add_subplot(321)
