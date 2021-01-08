@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import graphing
-#from pyNN.utility.plotting import plot_spiketrains
 
 class Connection:
     def __init__(self, sourceNode, targetNode, weights, delay = 0):
@@ -24,7 +23,6 @@ class Connection:
         newConnection.weights = newWeights
         return newConnection
 
-
 class PlasticConnection(Connection):
     def __init__(self, sourceNode, targetNode, weights, delay = 0, lr = 0.01, beta = 2, logWeights = False):
         super().__init__(sourceNode, targetNode, weights, delay)
@@ -33,11 +31,12 @@ class PlasticConnection(Connection):
         self.beta = beta
         self.weightHistory = [[],[]]
 
-    def recordWeights(self, t):
-        self.weightHistory[0] += [t]
+    def recordWeights(self):
+        self.weightHistory[0] += [self.target.step]
         self.weightHistory[1] += [self.weights]
 
-    def update(self, step):
+    def update(self):
+        step = self.target.step
         Vm = self.target.Vm[:,[step]] #post-synaptic population
         spiketrains = self.source.spiketrains[:,[step]] #pre-synaptic population
         rate = self.target.rate[:,[step-1]] #post-synaptic rate
@@ -48,30 +47,18 @@ class PlasticConnection(Connection):
         for idx in idxSpiked:
             dw = - 2*(Vm + regL2*rate) - self.weights[:,idx]
             dw[idx] -= regL2
-            self.weights[:,idx] += self.lr*dw
-# class SlowConnection(Connection):
-#     def __init__(self, sourceNode, targetNode, weights, decay, precision = 0.0001, delay = 0):
-#         super().__init__(sourceNode, targetNode, weights, delay)
-#         self.decay = decay
-#         self.precision = precision
-#         self.psp = np.empty([])        
+            self.weights[:,idx] += self.lr*dw     
 
 class Node():
     def __init__(self, name, n_neurons):
         self.n_neurons = n_neurons
         self.name = name
 
-    #@abstractmethod
     def initialise(self, steps):
         pass
 
-   # @abstractmethod
     def propagate(self, steps):
         pass
-
-# class Input(Node):
-#     def __init__(self, n_neurons):
-#         super().__init__('input', n_neurons)
 
 class SpikingInput(Node):
     def __init__(self, name, n_neurons):
@@ -150,6 +137,7 @@ class Population(Node):
         self.fastConnections = dict()
         self.slowConnections = dict()
         self.outputConnections = dict()
+        self.step = 1 #simulation counter
 
     def initialise(self, steps, timestep = None):
         #Initialise timeseries arrays of data (membrane V, spiketrains, threshold voltage, rates, output)
@@ -215,23 +203,24 @@ class Population(Node):
         self.output = np.zeros((outputdim, 1))
         print("Successfully added output from", self.name)
 
-    def updateWeights(self, step):
+    def updateWeights(self):
         for _, proj in self.fastConnections.items():
             if isinstance(proj, PlasticConnection):
-                proj.update(step)
+                proj.update()
         for _, proj in self.slowConnections.items():
             if isinstance(proj, PlasticConnection):
-                proj.update(step)
+                proj.update()
 
-    def logWeights(self, step):
+    def logWeights(self):
         for _, proj in self.fastConnections.items():
             if isinstance(proj, PlasticConnection) and proj.logWeights:
-                proj.recordWeights(step)
+                proj.recordWeights()
         for _, proj in self.slowConnections.items():
             if isinstance(proj, PlasticConnection) and proj.logWeights:
-                proj.recordWeights(step)
+                proj.recordWeights()
 
     def propagate(self, step, timestep, oneSpikePerStep):
+        self.step = step
         #LEAK MEMBRANE VOLTAGE
         self.Vm[:,[step]] = self.Vm[:,[step-1]] - timestep * self.leak * (self.Vm[:,[step-1]] + np.random.normal(0, self.noise * self.Vt[:,[0]], (self.n_neurons,1)))
 
@@ -281,8 +270,8 @@ class Population(Node):
         #                 VaboveThresh += proj.weights[:,[idx]]
         #                 print(VaboveThresh)
 
-        else:
-            self.spiketrains[:,[step]] = np.greater(self.Vm[:,[step]], self.Vt)
+        else: #BREAKS THE SIMULATION
+            self.spiketrains[:,[step]] = np.greater(self.Vm[:,[step]], self.Vt[:,[step]])
 
         #UPDATE RATES
         self.rate[:,[step]] = (1 - self.leak * timestep) * self.rate[:,[step-1]] + self.spiketrains[:,[step]]
@@ -292,11 +281,11 @@ class Population(Node):
             self.output[:,[step]] = self.output[:,[step-1]] + self.fastConnections['output'].weights @ self.spiketrains[:,[step]] + timestep * (-self.leak * self.output[:,[step-1]])
 
         #UPDATE WEIGHTS
-        self.updateWeights(step)       
+        self.updateWeights()       
 
         #LOG WEIGHTS
         if step % 100:
-            self.logWeights(step)
+            self.logWeights()
 
 
 
