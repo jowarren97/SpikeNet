@@ -1,3 +1,5 @@
+import numpy as np
+
 class SpikingInput(Node):
     def __init__(self, name, n_neurons):
         super().__init__('name', n_neurons)
@@ -59,3 +61,7 @@ class GaussianCurrentInput(CurrentInput):
             raise ValueError("Mean array is not of the right shape")
 
         #self.I = #WRITE CODE
+
+class mnistInput(CurrentInput):
+    def __init__():
+        pass

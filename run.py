@@ -1,5 +1,4 @@
-from euler import *
-from inputs import *
+from model import *
 
 T = 4000
 N = 100
