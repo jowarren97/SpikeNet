@@ -2,53 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import graphing
 
-class Connection:
-    def __init__(self, sourceNode, targetNode, weights, delay = 0):
-        self.source = sourceNode
-        self.target = targetNode
-        self.weights = weights
-        self.delay = delay
-
-    def __add__(self, other):
-        if isinstance(self, Connection) != isinstance(other, Connection):
-            raise TypeError("Cannot add an object of type", type(other).__name__, "to an object of type", type(self).__name__)
-        elif type(self) != type(other):
-            print("Warning: adding a connection of type", type(other).__name__, "to a connection of type", type(self).__name__, ". Type", type(self).__name__, "was assumed.")
-
-        if (self.source, self.target, self.delay) != (other.source, other.target, other.delay):
-            raise ValueError("Parameters of connections do not allow addition.")
-
-        newWeights = self.weights + other.weights
-        newConnection = self
-        newConnection.weights = newWeights
-        return newConnection
-
-class PlasticConnection(Connection):
-    def __init__(self, sourceNode, targetNode, weights, delay = 0, lr = 0.01, beta = 2, logWeights = False):
-        super().__init__(sourceNode, targetNode, weights, delay)
-        self.logWeights = logWeights
-        self.lr = lr
-        self.beta = beta
-        self.weightHistory = [[],[]]
-
-    def recordWeights(self):
-        self.weightHistory[0] += [self.target.step]
-        self.weightHistory[1] += [self.weights]
-
-    def update(self):
-        step = self.target.step
-        Vm = self.target.Vm[:,[step]] #post-synaptic population
-        spiketrains = self.source.spiketrains[:,[step]] #pre-synaptic population
-        rate = self.target.rate[:,[step-1]] #post-synaptic rate
-        regL2 = self.target.regL2
-
-        idxSpiked = np.where(spiketrains==1)
-
-        for idx in idxSpiked:
-            dw = - 2*(Vm + regL2*rate) - self.weights[:,idx]
-            dw[idx] -= regL2
-            self.weights[:,idx] += self.lr*dw     
-
 class Node():
     def __init__(self, name, n_neurons):
         self.n_neurons = n_neurons
@@ -59,68 +12,6 @@ class Node():
 
     def propagate(self, steps):
         pass
-
-class SpikingInput(Node):
-    def __init__(self, name, n_neurons):
-        super().__init__('name', n_neurons)
-
-class CurrentInput(Node):
-    def __init__(self, name, n_neurons):
-        super().__init__(name, n_neurons)
-        self.I = np.array([])
-
-    def initialise(self, steps, timestep):
-        pass
-
-    def parseAmplitudes(self, amplitudes):
-        if amplitudes == None:
-            amplitudes = np.array(self.n_neurons*[[1]])
-        elif type(amplitudes) == list:
-            amplitudes = np.asarray([amplitudes]).T
-        elif type(amplitudes) != np.ndarray:
-            raise TypeError("Amplitude argument is neither a list nor nd array")
-        
-        if amplitudes.shape != (self.n_neurons, 1):
-            raise ValueError("Amplitude argument is not of the right shape")
-        return amplitudes
-
-class ConstantCurrentInput(CurrentInput):
-    def __init__(self, n_neurons, amplitudes = None):
-        super().__init__('input', n_neurons)
-        self.I = self.parseAmplitudes(amplitudes)
-
-    def initialise(self, steps, timestep):
-        self.I = np.repeat(self.I, steps, 1)
-
-class SinusoidalCurrentInput(CurrentInput):
-    def __init__(self, n_neurons, amplitudes = None, angularVelocity = 1/20):
-        super().__init__('input', n_neurons)   
-        self.amplitudes = self.parseAmplitudes(amplitudes)
-        self.omega = angularVelocity
-        self.x = np.array([])
-        self.xdot = np.array([])
-
-    def initialise(self, steps, timestep):
-        t = np.arange(0, steps) * timestep
-        self.x = self.amplitudes * np.sin(2*np.pi * self.omega * t)
-        self.xdot = self.amplitudes * 2*np.pi * self.omega * np.cos(2*np.pi * self.omega * t)
-        self.I = self.x + 10*self.xdot #!!! 10 is 1/leak !!! IMPLEMENT BETTER
-
-class GaussianCurrentInput(CurrentInput):
-    def __init__(self, n_neurons, mean, covariance):
-        super().__init__('input', n_neurons)   
-        self.name = 'input'
-        self.n_neurons = n_neurons
-        self.mean = mean
-        self.covariance = covariance
-
-    def initialise(self):
-        if self.covariance.shape != (self.n_neurons, self.n_neurons):
-            raise ValueError("Covariance array is not of the right shape")
-        if self.mean.shape != (self.n_neurons, 1):
-            raise ValueError("Mean array is not of the right shape")
-
-        #self.I = #WRITE CODE
 
 class Population(Node):
     def __init__(self, name = 'pop', n_neurons = 1, leak = 0.1, noise = 0.1):
@@ -288,7 +179,6 @@ class Population(Node):
             self.logWeights()
 
 
-
 class Simulation:
     def __init__(self):
         self.populations = []
@@ -333,51 +223,3 @@ class Simulation:
         while self.step < self.steps:
             self.propagate()
 
-T = 4000
-N = 100
-pop = Population(name = 'pop', n_neurons = N)
-inp = SinusoidalCurrentInput(n_neurons = 1, amplitudes = [2.0], angularVelocity=1/50)
-
-r = np.array(int(N/2)*[[0.1]]+int(N/2)*[[-0.1]]).T
-pop.addConnection(node = inp, weights = r)
-
-w = - r.T @ r
-#pop.addReccurence(weights = w)
-w_rand = - 0.001*np.random.rand(N,N) - 0.005*np.eye(N,N)
-pop.addReccurence(weights = w_rand, plastic=True)
-pop.addOutput(r, 1)
-
-sim = Simulation()
-sim.addPopulations([pop])
-sim.addInputs([inp])
-
-sim.run(duration = T)
-
-print("done simulation")
-
-t = np.arange(0, T, 0.1)
-#plt.figure()
-#plt.plot(pop.fastConnections[pop.name].weightHistory[0,:], pop.fastConnections[pop.name].weightHistory[1])
-fig = plt.figure()
-
-ax = fig.add_subplot(321)
-graphing.plotOutputInput(inp.x, pop.output, t, ax)
-
-ax2 = fig.add_subplot(323)
-for v in pop.Vm[:1]:
-    ax2.set_xlim(0, t[-1])
-    ax2.plot(t, v)
-    ax2.set_xlabel("time /ms")
-    ax2.set_ylabel("Vm")
-
-for T in pop.Vt:
-    ax2.plot(t, T, '--')
-
-ax3 = fig.add_subplot(325)
-graphing.plotSpiketrains(pop, ax3, t)
-
-ax4 = fig.add_subplot(122)
-graphing.plotISI(pop, ax=ax4)
-
-plt.tight_layout()
-plt.show()
