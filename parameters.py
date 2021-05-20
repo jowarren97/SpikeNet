@@ -10,7 +10,7 @@ class default_params():
         self.adaptiveThreshold = False
         self.refractory_period = 0 #ms
 
-        self.duration = 40000 #ms
+        self.duration = 10000 #ms
         self.timestep = 1 #ms
 
         if self.leak*self.timestep >= 1:
@@ -23,8 +23,8 @@ class default_params():
         #CONNECTIONS
         self.learning = ['fwd', 'rec']
         self.learning_onset = 0
-        self.learning_rule_rec = enforcedRec #'enforced' 
-        self.learning_rule_fwd = brendel2020fwd
+        self.learning_rule_rec = None #'enforced' 
+        self.learning_rule_fwd = None
         self.use_pseudo = False
         self.lr = 0.0001 #0.01
         self.beta = 2

@@ -16,6 +16,7 @@ net = SCN(params, inp)
 
 net()
 
+pop = net.populations[0]
 print("done simulation")
 print(pop.Vt[0,0:2])
 t = np.arange(0, params.duration, params.timestep)
@@ -48,13 +49,13 @@ t = np.arange(0, params.duration, params.timestep)
 fig1 = plt.figure()
 graphing.plotOutputInput(inp.x, pop.output, t, fig1.gca())
 
-fig2, axes = plt.subplots(nrows=1, ncols=3)
-im = axes[0].imshow(w_init, vmin=-0.01, vmax=0.01, cmap='hot')
-im = axes[1].imshow(pop.fastConnections[pop.name].weights, vmin=-0.01, vmax=0.01, cmap='hot')
-im = axes[2].imshow(- r.T @ r, vmin=-0.01, vmax=0.01, cmap='hot')
-fig2.subplots_adjust(right=0.8)
-cbar_ax = fig2.add_axes([0.85, 0.15, 0.05, 0.7])
-fig2.colorbar(im, cax=cbar_ax)
+# fig2, axes = plt.subplots(nrows=1, ncols=3)
+# im = axes[0].imshow(w_init, vmin=-0.01, vmax=0.01, cmap='hot')
+# im = axes[1].imshow(pop.fastConnections[pop.name].weights, vmin=-0.01, vmax=0.01, cmap='hot')
+# im = axes[2].imshow(- r.T @ r, vmin=-0.01, vmax=0.01, cmap='hot')
+# fig2.subplots_adjust(right=0.8)
+# cbar_ax = fig2.add_axes([0.85, 0.15, 0.05, 0.7])
+# fig2.colorbar(im, cax=cbar_ax)
 
 fig3 = plt.figure()
 graphing.plotSpiketrains(pop, fig3.gca(), t)

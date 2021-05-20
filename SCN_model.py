@@ -6,7 +6,6 @@ class SCN:
         self.pars = pars
         self.populations = []
         self.input = input
-        self.step = 1
         self.timestep = pars.timestep
         self.duration = pars.duration
         self.steps = pars.steps
@@ -41,12 +40,12 @@ class SCN:
         for pop in self.populations:
             pop.initialise(self.steps)
 
-    def propagate(self, step, record_data):
-        self.input.propagate(step, self.timestep)
+    def step(self, iter, record_data):
+        self.input.step(iter, self.timestep)
 
         for pop in self.populations:
-            pop.propagate(step, self.timestep)
-            #inp.propogate(self.step, self.timestep)
+            pop.step(iter, self.timestep)
+            #inp.propogate(self.iter, self.timestep)
 
             if record_data:
                 data = pop.get_data()
@@ -55,5 +54,5 @@ class SCN:
         self.initialise()
 
         for i in range(self.steps):
-            self.propagate(i, record_data)
+            self.step(i, record_data)
 
