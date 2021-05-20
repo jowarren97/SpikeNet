@@ -45,16 +45,16 @@ class Population(Node):
             # self.Vt[i,0] = 0.5 * (np.dot(r[:,i], r[:,i].T) + self.regL1*self.leak + self.regL2*self.leak**2)
             self.Vt[i] = 0.5 * (np.dot(r[:,i], r[:,i].T) + self.regL1*self.leak + self.regL2*self.leak**2)
         #Add recurrent connections that implement L1 & L2 regularisation on firing rates (Boerlin 2013)
-        if not self.pars.adaptiveThreshold:
+        if not self.pars.adaptiveThreshold and not self.pars.learning:
             self.addConnection(self.pars, node=self, weights= - self.regL2 * self.leak**2 * np.eye(self.n_neurons), connType='fast')
 
-    def addConnection(self, pars, node, weights, connType = 'fast', delay = 0, plastic = False):
+    def addConnection(self, pars, node, weights, connType = 'fast', delay = 0, learning_rule = None):
         if weights.shape != (node.n_neurons, self.n_neurons):
             raise ValueError("Passed array is not of the right shape")
 
-        if plastic:
+        if learning_rule is not None:
             print("added plastic conn")
-            proj = PlasticConnection(pars, node, self, weights, delay) #NEED TO PROVIDE INPUT FOR LR AND BETA
+            proj = PlasticConnection(pars, node, self, weights, delay, learning_rule=learning_rule)
         else:
             proj = Connection(pars, node, self, weights, delay)
 

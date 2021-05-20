@@ -19,11 +19,13 @@ class default_params():
         self.save_data = ['output', 'spiketrains']
 
         #CONNECTIONS
-        self.learning = True
+        self.learning = ['fwd', 'rec']
         self.learning_onset = 0
-        self.learning_rule = 'brendel2020'
+        self.learning_rule_rec = 'enforced_rec' #'enforced' 
+        self.learning_rule_fwd = 'brendel2020fwd'
         self.use_pseudo = False
-        self.lr = 0.01
+        self.lr = 0.0001 #0.01
         self.beta = 2
+        self.alpha = 1
 
     

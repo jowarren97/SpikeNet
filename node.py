@@ -3,8 +3,8 @@ class Node():
         self.n_neurons = n_neurons
         self.name = name
 
-    def initialise(self, steps):
+    def initialise(self, step):
         pass
 
-    def propagate(self, steps):
+    def propagate(self, step, timestep):
         pass
