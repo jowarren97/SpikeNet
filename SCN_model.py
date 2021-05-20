@@ -20,7 +20,7 @@ class SCN:
         for p in self.populations:
             #add feedforward connections
             r = np.array(int(p.n_neurons/2)*[[0.1]]+int(p.n_neurons/2)*[[-0.1]]).T
-            p.addConnection(self.pars, node=self.input, weights=r, learning_rule=self.pars.learning_rule_rec)
+            p.addConnection(self.pars, node=self.input, weights=r, learning_rule=self.pars.learning_rule_fwd)
 
             #add recurrent connections
             if not self.pars.learning:
@@ -28,7 +28,7 @@ class SCN:
             else:
                 # w_init = - 0.001*np.random.rand(N,N) - 0.005*np.eye(N,N)
                 w_init = np.zeros((p.n_neurons,p.n_neurons))
-            p.addConnection(self.pars, node=p, weights=w_init, learning_rule=self.pars.learning_rule_fwd)
+            p.addConnection(self.pars, node=p, weights=w_init, learning_rule=self.pars.learning_rule_rec)
 
             #add output connections
             p.addOutput(r, 1)

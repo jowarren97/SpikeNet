@@ -10,27 +10,8 @@ import numpy as np
 params = default_params()
 T = params.duration
 N = params.n_neurons
-# pop = Population(params)
+
 inp = SinusoidalCurrentInput(n_neurons = 1, amplitudes = [1.0], angularVelocity=1/500, pars=params)
-
-# r = np.array(int(N/2)*[[0.1]]+int(N/2)*[[-0.1]]).T
-# # r = np.array([[0.1]])
-# pop.addConnection(params, node=inp, weights=r, learning_rule=None)
-
-# if not params.learning:
-#     w_init = - r.T @ r
-# #pop.addReccurence(weights = w)
-# else:
-#     # w_init = - 0.001*np.random.rand(N,N) - 0.005*np.eye(N,N)
-#     w_init = np.zeros((N,N))
-# pop.addConnection(params, node=pop, weights=w_init, learning_rule=enforcedRec)
-# pop.addOutput(r, 1)
-
-# net = SCN(params)
-# net.addPopulations([pop])
-# net.addInputs([inp])
-# net.initialise()
-
 net = SCN(params, inp)
 
 net()

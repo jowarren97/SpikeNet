@@ -1,3 +1,5 @@
+from learning_rules import *
+
 class default_params():
     def __init__(self):
         self.n_neurons = 20
@@ -21,8 +23,8 @@ class default_params():
         #CONNECTIONS
         self.learning = ['fwd', 'rec']
         self.learning_onset = 0
-        self.learning_rule_rec = 'enforced_rec' #'enforced' 
-        self.learning_rule_fwd = 'brendel2020fwd'
+        self.learning_rule_rec = enforcedRec #'enforced' 
+        self.learning_rule_fwd = brendel2020fwd
         self.use_pseudo = False
         self.lr = 0.0001 #0.01
         self.beta = 2
