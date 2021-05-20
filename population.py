@@ -1,6 +1,6 @@
 import numpy as np
 from parameters import *
-from connections import * 
+from connection import Connection 
 from inputs import *  
 from node import Node
 
@@ -23,7 +23,6 @@ class Population(Node):
         #catalogue of connections
         self.fastConnections = dict()
         self.slowConnections = dict()
-        self.outputConnections = dict()
         #book keeping
         self.step = 0
 
@@ -33,11 +32,7 @@ class Population(Node):
         self.spiketrains = np.zeros((self.n_neurons, steps))
         # self.Vt = np.zeros((self.n_neurons, steps))
         self.rate = np.zeros((self.n_neurons, steps))
-        if 'output' in self.fastConnections:
-            outputdim = self.output.shape[0]
-            self.output = np.zeros((outputdim, steps))
-        else:
-            print("Warning: no output has been added to the population")
+        self.output = np.zeros((1, steps)) #CHANGE 1
 
         #Initialise initial value for threshold voltage
         r = self.fastConnections['input'].weights
@@ -48,50 +43,36 @@ class Population(Node):
         if not self.pars.adaptiveThreshold and not self.pars.learning:
             self.addConnection(self.pars, node=self, weights= - self.regL2 * self.leak**2 * np.eye(self.n_neurons), connType='fast')
 
-    def addConnection(self, pars, node, weights, connType = 'fast', delay = 0, learning_rule = None):
+    def addConnection(self, pars, node, weights, conn_type = 'fast', delay = 0, learning_rule = None):
+        
         if weights.shape != (node.n_neurons, self.n_neurons):
-            raise ValueError("Passed array is not of the right shape")
+            raise ValueError("Passed weight array is not of the right shape")
 
-        if learning_rule is not None:
-            print("added plastic conn")
-            proj = PlasticConnection(pars, node, self, weights, delay, learning_rule=learning_rule)
-        else:
-            proj = Connection(pars, node, self, weights, delay)
+        new_proj = Connection(pars, node, self, weights, delay, learning_rule)
 
-        if connType == 'fast':
+        if conn_type == 'fast':
             if node.name in self.fastConnections: #check if already existing connection
-                self.fastConnections[node.name] += proj
-                print("Warning: adding provided weight matrix to existing connection.")
+                self.fastConnections[node.name] += new_proj
+                print("W: adding provided weight matrix to existing connection.")
             else:
-                self.fastConnections[node.name] = proj
-        elif connType == 'slow':
+                self.fastConnections[node.name] = new_proj
+        elif conn_type == 'slow':
             if node.name in self.slowConnections: #check if already existing connection
-                self.slowConnections[node.name] += proj
-                print("Warning: adding provided weight matrix to existing connection.")
+                self.slowConnections[node.name] += new_proj
+                print("W: adding provided weight matrix to existing connection.")
             else:
-                self.slowConnections[node.name] = proj
+                self.slowConnections[node.name] = new_proj
         else:
-            print("Unsuccessfully addition of connection from", node.name, "node to", self.name, "node. Please specify connection type either 'fast' or 'slow'.")
+            print("Unsuccessful addition of connection from", node.name, "node to", self.name, "node. Please specify connection type either 'fast' or 'slow'.")
             return
         
-        print("Successfully added connection from", node.name, "node to", self.name, "node.")
-
-    def addOutput(self, weights, outputdim = 1):
-        if weights.shape != (outputdim, self.n_neurons):
-            raise ValueError("Passed array is not of the right shape")
-
-        proj = Connection(None, None, None, weights)
-        self.fastConnections['output'] = proj
-        self.output = np.zeros((outputdim, 1))
-        print("Successfully added output from", self.name)
+        print("Successfully added connection of type", conn_type, "from", node.name, "node to", self.name, "node.")
 
     def updateWeights(self):
         for _, proj in self.fastConnections.items():
-            if isinstance(proj, PlasticConnection):
-                proj.update()
+            proj.update()
         for _, proj in self.slowConnections.items():
-            if isinstance(proj, PlasticConnection):
-                proj.update()
+            proj.update()
 
     def propagate(self, step, timestep):
         #book keeping
@@ -148,9 +129,13 @@ class Population(Node):
         self.rate[:,[step]] = (1 - self.leak * timestep) * self.rate[:,[step-1]] + self.spiketrains[:,[step]]
 
         #UPDATE OUTPUTS
-        if 'output' in self.fastConnections:
-            self.output[:,[step]] = (1 - self.leak * timestep) * self.output[:,[step-1]] + self.fastConnections['output'].weights @ self.spiketrains[:,[step]]
+        if 'input' in self.fastConnections:
+            self.output[:,[step]] = (1 - self.leak * timestep) * self.output[:,[step-1]] + self.fastConnections['input'].weights @ self.spiketrains[:,[step]]
 
         #UPDATE WEIGHTS
         if self.pars.learning:
-            self.updateWeights()       
+            self.updateWeights()   
+
+
+    def get_data(self):
+        return
