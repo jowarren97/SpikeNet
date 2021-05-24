@@ -7,17 +7,17 @@ def plotSignals(signals, ax, t):
     for signal in signals:  
         ax.plot(t, signal)
 
+
 def plotOutputInput(inputs, outputs, t, ax=None):
     ax.set_xlim(0, t[-1])
     ax.set_xlabel('Time /ms')
     ax.set_ylabel("value")
 
     for output in outputs: 
-        ax.plot(t, output, 'b')
+        ax.plot(t, output)
     
     for input in inputs:
-        ax.plot(t, input, 'r')
- 
+        ax.plot(t, input)
 
 
 def plotISI(pop, timestep = 0.01, ax = None):

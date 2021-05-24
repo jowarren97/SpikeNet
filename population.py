@@ -32,16 +32,16 @@ class Population(Node):
         self.spiketrains = np.zeros((self.n_neurons, steps))
         # self.Vt = np.zeros((self.n_neurons, steps))
         self.rate = np.zeros((self.n_neurons, steps))
-        self.output = np.zeros((1, steps)) #CHANGE 1
+        self.output = np.zeros((2, steps)) #CHANGE 1
 
         #Initialise initial value for threshold voltage
         F = self.fastConnections['input'].weights
         for i in range(0, self.n_neurons):
-            # self.Vt[i,0] = 0.5 * (np.dot(r[:,i], r[:,i].T) + self.regL1*self.leak + self.regL2*self.leak**2)
             self.Vt[i] = 0.5 * (np.dot(F[:,i], F[:,i].T) + self.regL1*self.leak + self.regL2*self.leak**2)
         #Add recurrent connections that implement L1 & L2 regularisation on firing rates (Boerlin 2013)
         if not self.pars.adaptiveThreshold and not self.pars.learning:
             self.addConnection(self.pars, node=self, weights= - self.regL2 * self.leak**2 * np.eye(self.n_neurons), connType='fast')
+
 
     def addConnection(self, pars, node, weights, conn_type = 'fast', delay = 0, learning_rule = None):
         
@@ -68,11 +68,13 @@ class Population(Node):
         
         print("Successfully added connection of type", conn_type, "from", node.name, "node to", self.name, "node.")
 
+
     def updateWeights(self):
         for _, proj in self.fastConnections.items():
             proj.update()
         for _, proj in self.slowConnections.items():
             proj.update()
+
 
     def step(self, iter, timestep):
         #book keeping
@@ -135,6 +137,14 @@ class Population(Node):
         #UPDATE WEIGHTS
         if self.pars.learning:
             self.updateWeights()   
+
+
+    def reset(self, steps):
+        self.Vm = np.zeros((self.n_neurons, steps))
+        self.spiketrains = np.zeros((self.n_neurons, steps))
+        # self.Vt = np.zeros((self.n_neurons, steps))
+        self.rate = np.zeros((self.n_neurons, steps))
+        self.output = np.zeros((3, steps)) #CHANGE 1
 
 
     def get_data(self):

@@ -1,33 +1,40 @@
+from arb_functions import DotDict
 from learning_rules import *
 
-class default_params():
-    def __init__(self):
-        self.n_neurons = 20
-        self.leak = 0.01
-        self.noise = 0.1
-        self.regL1 = 0.0
-        self.regL2 = 0.0 #doesnt seem to work with learning...?
-        self.adaptiveThreshold = False
-        self.refractory_period = 0 #ms
+def default_params():
+    params = DotDict()
+    params.n_neurons = 4
+    params.leak = 0.01
+    params.noise = 0.1
+    params.regL1 = 0.0
+    params.regL2 = 0.0 #doesnt seem to work with learning...?
+    params.adaptiveThreshold = False
+    params.refractory_period = 0 #ms
 
-        self.duration = 10000 #ms
-        self.timestep = 1 #ms
+    params.duration = 100000 #ms
+    params.timestep = 1 #ms
 
-        if self.leak*self.timestep >= 1:
-            raise ValueError('Leak/timestep combination is greater than 1')
+    if params.leak*params.timestep >= 1:
+        raise ValueError('Leak/timestep combination is greater than 1')
 
-        self.steps = int(self.duration/self.timestep)
-        self.oneSpikePerStep = True
-        self.save_data = ['output', 'spiketrains']
+    params.steps = int(params.duration/params.timestep)
+    params.oneSpikePerStep = True
+    params.save_data = ['output', 'spiketrains']
 
-        #CONNECTIONS
-        self.learning = ['fwd', 'rec']
-        self.learning_onset = 0
-        self.learning_rule_rec = None #'enforced' 
-        self.learning_rule_fwd = None
-        self.use_pseudo = False
-        self.lr = 0.0001 #0.01
-        self.beta = 2
-        self.alpha = 1
+    #CONNECTIONS
+    params.learning = ['fwd', 'rec']
+    params.learning_onset = 0
+    params.learning_rule_rec = brendel2020rec #'enforced' 
+    params.learning_rule_fwd = None
+    params.use_pseudo = False
+    params.enforced_norm = True
+    params.lr_rec = 0.01 #0.01
+    params.lr_fwd = 0.0001
+    params.beta = 2
+    params.alpha = 1
+    params.upper_V_cap = True #when learning recurrent weights, helps to cap voltages at Vthresh to prevent divergence
+    params.lower_V_cap = False
+
+    return params
 
     

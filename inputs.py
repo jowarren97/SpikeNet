@@ -34,18 +34,22 @@ class ConstantCurrentInput(CurrentInput):
         self.I = np.repeat(self.I, steps, 1)
 
 class SinusoidalCurrentInput(CurrentInput):
-    def __init__(self, n_neurons, amplitudes = None, angularVelocity = 1/20, pars=None):
-        super().__init__('input', n_neurons)   
+    def __init__(self, n_neurons, phases = None, amplitudes = None, angularVelocity = 1/20, pars=None):
+        super().__init__('input', n_neurons)  
         self.amplitudes = self.parseAmplitudes(amplitudes)
+        self.phases = phases
         self.omega = angularVelocity
-        self.x = np.array([])
-        self.xdot = np.array([])
         self.pars = pars
 
     def initialise(self, steps, timestep):
         t = np.arange(0, steps) * timestep
-        self.x = self.amplitudes * np.sin(2*np.pi * self.omega * t)
-        self.xdot = self.amplitudes * 2*np.pi * self.omega * np.cos(2*np.pi * self.omega * t)
+        self.x = np.zeros((self.n_neurons, steps))
+        self.xdot = np.zeros((self.n_neurons, steps))
+
+        for i in range(self.n_neurons):
+            self.x[i,:] = self.amplitudes[i] * np.sin(2*np.pi * self.omega * t + self.phases[i] * 2*np.pi/360)
+            self.xdot[i,:] = self.amplitudes[i] * 2*np.pi * self.omega * np.cos(2*np.pi * self.omega * t + self.phases[i] * 2*np.pi/360)
+
         self.I = self.x + (1/self.pars.leak)*self.xdot #!!! 10 is 1/leak !!! IMPLEMENT BETTER
 
 class GaussianCurrentInput(CurrentInput):

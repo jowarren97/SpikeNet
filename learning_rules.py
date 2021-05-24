@@ -1,5 +1,6 @@
 import numpy as np
 from inputs import *
+from arb_functions import *
 
 def brendel2020rec(conn, pre_pop, post_pop):        
     iter = post_pop.iter
@@ -8,13 +9,21 @@ def brendel2020rec(conn, pre_pop, post_pop):
     rate = post_pop.rate[:,[iter-1]].flatten() #post-synaptic rate
     regL2 = post_pop.regL2
 
+    if conn.pars.upper_V_cap:
+        Vm = np.minimum(Vm, post_pop.Vt.flatten())
+    if conn.pars.lower_V_cap:
+        Vm = np.maximum(Vm, -post_pop.Vt.flatten())
+
     idxSpiked = np.where(spiketrains==1)[0]
 
     if iter > conn.pars.learning_onset:
         for idx in idxSpiked:
             dw = - conn.pars.beta * (Vm + regL2*rate) - conn.weights[:,idx]
             dw[idx] -= regL2
-            conn.weights[:,idx] += conn.pars.lr*dw
+            conn.weights[:,idx] += conn.pars.lr_rec*dw
+
+    # if conn.pars.enforced_norm:
+    #     conn.weights = normalize(conn.weights)
     return
 
 def brendel2020fwd(conn, pre_pop, post_pop):
@@ -31,7 +40,7 @@ def brendel2020fwd(conn, pre_pop, post_pop):
     if iter > conn.pars.learning_onset:
         for idx in post_spiked:
             dw = conn.pars.alpha * inp.flatten() - conn.weights[:,idx]
-            conn.weights[:,idx] += conn.pars.lr * dw
+            conn.weights[:,idx] += conn.pars.lr_fwd * dw
     return
 
 def enforcedRec(conn, pre_pop, post_pop):
@@ -58,8 +67,7 @@ def eligibilityTraceRec(conn, pre_pop, post_pop):
             idx_spiked = np.where(post_spikes==1)[0]
             for idx in idx_spiked:
                 dw = - V[idx] * conn.eligibility_trace[:,idx]
-                conn.weights[:,idx] += conn.pars.lr*dw
-
+                conn.weights[:,idx] += conn.pars.lr_rec*dw
     return
 
 def eligibilityTraceFwd(conn, pre_pop, post_pop):
@@ -71,22 +79,26 @@ def eligibilityTraceFwd(conn, pre_pop, post_pop):
         inp = pre_pop.spiketrains[:,[iter]]
 
     alpha = (1 - post_pop.leak * conn.pars.timestep)
+    
     V = post_pop.Vm[:,[iter]]
     Vt = post_pop.Vt
     #             #output
     # W = #input [       ]
-    eligibility_trace_new =  alpha * conn.eligibility_trace + np.repeat(inp, post_pop.n_neurons, axis=1)
+    conn.eligibility_trace =  (alpha * conn.eligibility_trace) + np.repeat(inp, post_pop.n_neurons, axis=1)
 
     if iter > conn.pars.learning_onset:
         if conn.pars.use_pseudo:
             pseudo_deriv = 1/Vt * np.maximum(np.zeros_like(V), np.ones_like(V) - np.abs((V - Vt) / Vt))
 
         else:
-            pseudo_deriv = post_pop.spiketrains == 1
+            pseudo_deriv = post_pop.spiketrains[:,[iter]] == 1
 
-        conn.eligibility_trace = eligibility_trace_new * pseudo_deriv.T + alpha * conn.eligibility_trace
+        dw = V.T * pseudo_deriv.flatten() * conn.eligibility_trace
+        new_weights = conn.weights + conn.pars.lr_fwd*dw 
 
-        dw = V.T * conn.eligibility_trace
-        conn.weights += conn.pars.lr*dw 
+        if conn.pars.enforced_norm:
+            conn.weights = normalize(new_weights)
+        else:
+            conn.weights = new_weights
 
     return

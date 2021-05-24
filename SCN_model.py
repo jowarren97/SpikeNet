@@ -1,5 +1,7 @@
+from arb_functions import *
 from population import Population
 import numpy as np
+from scipy.stats import norm
 
 class SCN:
     def __init__(self, pars, input):
@@ -19,17 +21,21 @@ class SCN:
         for p in self.populations:
             #add feedforward connections
             if self.pars.learning_rule_fwd is None:
-                F = np.array(int(p.n_neurons/2)*[[0.1]]+int(p.n_neurons/2)*[[-0.1]]).T
+                F = equidist_weights(p.n_neurons, self.input.n_neurons)
+                F = normalize(F)
             else:
-                F = np.array(int(p.n_neurons/2)*[[0.1]]+int(p.n_neurons/2)*[[-0.1]]).T
+                F = np.random.normal(loc=0.0, scale=1.0, size=(self.input.n_neurons, p.n_neurons))
+                # F = w_dist.rvs(size=(self.input.n_neurons, p.n_neurons))
+                # F = np.array(int(p.n_neurons/2)*[[0.1,0.1]]+int(p.n_neurons/2)*[[-0.1,-0.1]]).T
+                F = normalize(F)
             p.addConnection(self.pars, node=self.input, weights=F, learning_rule=self.pars.learning_rule_fwd)
 
             #add recurrent connections
             if self.pars.learning_rule_rec is None:
                 w_init = - F.T @ F
             else:
-                # w_init = - 0.001*np.random.rand(N,N) - 0.005*np.eye(N,N)
-                w_init = np.zeros((p.n_neurons,p.n_neurons))
+                w_init = - 0.001*np.random.rand(p.n_neurons) - 0.005*np.eye(p.n_neurons)
+                # w_init = np.zeros((p.n_neurons,p.n_neurons))
             p.addConnection(self.pars, node=p, weights=w_init, learning_rule=self.pars.learning_rule_rec)
 
         return
