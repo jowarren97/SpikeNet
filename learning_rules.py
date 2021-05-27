@@ -22,8 +22,6 @@ def brendel2020rec(conn, pre_pop, post_pop):
             dw[idx] -= regL2
             conn.weights[:,idx] += conn.pars.lr_rec*dw
 
-    # if conn.pars.enforced_norm:
-    #     conn.weights = normalize(conn.weights)
     return
 
 def brendel2020fwd(conn, pre_pop, post_pop):
@@ -97,7 +95,7 @@ def eligibilityTraceFwd(conn, pre_pop, post_pop):
         new_weights = conn.weights + conn.pars.lr_fwd*dw 
 
         if conn.pars.enforced_norm:
-            conn.weights = normalize(new_weights)
+            conn.weights = normalize(new_weights, conn.pars.weight_scale)
         else:
             conn.weights = new_weights
 

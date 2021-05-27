@@ -67,3 +67,7 @@ class GaussianCurrentInput(CurrentInput):
             raise ValueError("Mean array is not of the right shape")
 
         #self.I = #WRITE CODE
+
+# class SquareCurrentInput(CurrentInput):
+#     def __init__(self, on_duration, off_duration, amplitude):
+        

@@ -6,11 +6,11 @@ import plotting_functions
 import matplotlib.pyplot as plt
 import numpy as np
 
-def train(model, inp):
+def train(model):
     model()
     return
 
-def test(model, inp):
+def test(model):
     model(record_data=True)
     return
 
@@ -21,7 +21,10 @@ N = params.n_neurons
 inp = SinusoidalCurrentInput(n_neurons = 2, amplitudes=[1,1], phases=[0,90], angularVelocity=1/500, pars=params)
 net = SCN(params, inp)
 
-net()
+# net()
+for i in range(params.train_its):
+    print('iteration', i)
+    train(net)
 
 pop = net.populations[0]
 print("done simulation")

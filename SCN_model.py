@@ -22,12 +22,13 @@ class SCN:
             #add feedforward connections
             if self.pars.learning_rule_fwd is None:
                 F = equidist_weights(p.n_neurons, self.input.n_neurons)
-                F = normalize(F)
+                F = normalize(F, self.pars.weight_scale)
             else:
-                F = np.random.normal(loc=0.0, scale=1.0, size=(self.input.n_neurons, p.n_neurons))
+                # F = np.random.normal(loc=0.0, scale=1.0, size=(self.input.n_neurons, p.n_neurons))
+                F = equidist_weights(p.n_neurons, self.input.n_neurons, amputation_frac=0.5)
                 # F = w_dist.rvs(size=(self.input.n_neurons, p.n_neurons))
                 # F = np.array(int(p.n_neurons/2)*[[0.1,0.1]]+int(p.n_neurons/2)*[[-0.1,-0.1]]).T
-                F = normalize(F)
+                F = normalize(F, self.pars.weight_scale)
             p.addConnection(self.pars, node=self.input, weights=F, learning_rule=self.pars.learning_rule_fwd)
 
             #add recurrent connections
