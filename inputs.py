@@ -1,5 +1,9 @@
 from node import Node
 import numpy as np
+from PIL import Image
+from arb_functions import *
+from sklearn.feature_extraction.image import extract_patches_2d
+import copy as cp
 
 class SpikingInput(Node):
     def __init__(self, name, n_neurons):
@@ -70,4 +74,42 @@ class GaussianCurrentInput(CurrentInput):
 
 # class SquareCurrentInput(CurrentInput):
 #     def __init__(self, on_duration, off_duration, amplitude):
+    
+class ImagePatchInput(CurrentInput):
+    def __init__(self, name, path='./data/test_images/', patch_size=(8,8), max_patches=1, r=200):
+        super().__init__(name, n_neurons=patch_size[0]*patch_size[1])
+        self.path = path
+        self.patch_size = patch_size
+        self.max_patches = max_patches
+        self.r = r
+        self.idx = 0
+        self.scale = 1
+
+    def load_patches(self, idx):
+        filepath = self.path + 'test_image_png_' + str(idx) + '.png'
+        # print(filepath)
+        im = Image.open(filepath)
+        im_array = np.array(im)
+
+        frame = rgb2gray(im_array)
+        frame = whiten_and_filter(frame, self.r)
+
+        frame = self.scale * frame / np.max(abs(frame))
+
+        patches = extract_patches_2d(frame, patch_size=self.patch_size, max_patches=self.max_patches)
+
+        return patches
+
+    def initialise(self, steps, timestep):
+        self.idx = self.idx % 2000
+        self.idx += 1
+        # print('loading from image', self.idx)
+        patches = self.load_patches(self.idx)
+        for patch in patches:
+            patch_vec = patch.flatten()
+            self.I = np.broadcast_to(patch_vec, (steps, len(patch_vec))).T
+            self.x = cp.deepcopy(self.I)           
+
         
+
+

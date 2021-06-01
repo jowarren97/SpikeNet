@@ -15,6 +15,8 @@ def default_params():
     params.timestep = 1 #ms
     params.train_its = 1
     params.reset = True
+    params.test_its = 100
+    params.test_freq = 500
 
     if params.leak*params.timestep >= 1:
         raise ValueError('Leak/timestep combination is greater than 1')
@@ -25,19 +27,45 @@ def default_params():
 
     #CONNECTIONS
     params.weight_scale = 0.1
+    params.weight_init = 'amputated' #[equidist, random, bipolar, amputated]
     params.learning = ['fwd', 'rec']
     params.learning_onset = 0 #in steps
-    params.learning_rule_rec = brendel2020rec #'enforced' 
+    params.learning_rule_rec = enforcedRec #'enforced' 
     params.learning_rule_fwd = eligibilityTraceFwd
     params.use_pseudo = False
     params.enforced_norm = True
     params.lr_rec = 0.01 #0.01
-    params.lr_fwd = 0.0001
+    params.lr_fwd = 0.001
     params.beta = 2
     params.alpha = 1
     params.upper_V_cap = True #when learning recurrent weights, helps to cap voltages at Vthresh to prevent divergence
     params.lower_V_cap = False
 
     return params
+
+def patches_params():
+    params = default_params()
+    params.n_neurons = 100
+    params.noise = 0.0
+    params.regL1 = 0.01
+
+    params.duration = 500 #ms #per stimulus
+    params.steps = int(params.duration/params.timestep)
+
+    params.learning_onset = 250 #in steps
+    params.train_its = 5000
+    params.test_its = 100
+    params.test_freq = 500
+
+    params.weight_scale = 0.1
+    params.weight_init = 'random'
+    params.learning_rule_rec = enforcedRec #'enforced' 
+    params.learning_rule_fwd = eligibilityTraceFwd
+    params.lr_rec = 0.01 #0.01
+    params.lr_fwd = 0.001
+
+    return params
+
+
 
     

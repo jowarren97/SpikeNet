@@ -30,31 +30,6 @@ pop = net.populations[0]
 print("done simulation")
 print(pop.Vt[0,0:2])
 t = np.arange(0, params.duration, params.timestep)
-# #plt.figure()
-# #plt.plot(pop.fastConnections[pop.name].weightHistory[0,:], pop.fastConnections[pop.name].weightHistory[1])
-# fig = plt.figure()
-
-# ax = fig.add_subplot(321)
-# plotting_functions.plotOutputInput(inp.x, pop.output, t, ax)
-
-# ax2 = fig.add_subplot(323)
-# for v in pop.Vm[:1]:
-#     ax2.set_xlim(0, t[-1])
-#     ax2.plot(t, v)
-#     ax2.set_xlabel("time /ms")
-#     ax2.set_ylabel("Vm")
-
-# for T in pop.Vt:
-#     ax2.plot(t, T, '--')
-
-# ax3 = fig.add_subplot(325)
-# plotting_functions.plotSpiketrains(pop, ax3, t)
-
-# ax4 = fig.add_subplot(122)
-# plotting_functions.plotISI(pop, ax=ax4)
-
-# plt.tight_layout()
-# plt.show()
 
 fig1 = plt.figure()
 plotting_functions.plotOutputInput(inp.x, pop.output, t, fig1.gca())

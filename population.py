@@ -32,7 +32,7 @@ class Population(Node):
         self.spiketrains = np.zeros((self.n_neurons, steps))
         # self.Vt = np.zeros((self.n_neurons, steps))
         self.rate = np.zeros((self.n_neurons, steps))
-        self.output = np.zeros((2, steps)) #CHANGE 1
+        self.output = np.zeros((self.inp_dim, steps)) #CHANGE 1
 
         #Initialise initial value for threshold voltage
         F = self.fastConnections['input'].weights
@@ -76,7 +76,7 @@ class Population(Node):
             proj.update()
 
 
-    def step(self, iter, timestep):
+    def step(self, iter, timestep, learning):
         #book keeping
         self.iter = iter
         #LEAK MEMBRANE VOLTAGE
@@ -135,7 +135,7 @@ class Population(Node):
             self.output[:,[iter]] = (1 - self.leak * timestep) * self.output[:,[iter-1]] + self.fastConnections['input'].weights @ self.spiketrains[:,[iter]]
 
         #UPDATE WEIGHTS
-        if self.pars.learning:
+        if learning:
             self.updateWeights()   
 
 
@@ -148,4 +148,5 @@ class Population(Node):
 
 
     def get_data(self):
-        return
+        loss = np.linalg.norm((self.output - self.fastConnections['input'].source.x), axis=0)
+        return loss

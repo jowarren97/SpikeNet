@@ -1,7 +1,6 @@
 from arb_functions import *
 from population import Population
 import numpy as np
-from scipy.stats import norm
 
 class SCN:
     def __init__(self, pars, input):
@@ -20,15 +19,19 @@ class SCN:
 
         for p in self.populations:
             #add feedforward connections
-            if self.pars.learning_rule_fwd is None:
+            if self.pars.weight_init == 'equidist':
                 F = equidist_weights(p.n_neurons, self.input.n_neurons)
-                F = normalize(F, self.pars.weight_scale)
-            else:
-                # F = np.random.normal(loc=0.0, scale=1.0, size=(self.input.n_neurons, p.n_neurons))
+            elif self.pars.weight_init == 'random':
+                F = np.random.normal(loc=0.0, scale=1.0, size=(self.input.n_neurons, p.n_neurons))
+            elif self.pars.weight_init == 'amputated':
                 F = equidist_weights(p.n_neurons, self.input.n_neurons, amputation_frac=0.5)
-                # F = w_dist.rvs(size=(self.input.n_neurons, p.n_neurons))
-                # F = np.array(int(p.n_neurons/2)*[[0.1,0.1]]+int(p.n_neurons/2)*[[-0.1,-0.1]]).T
-                F = normalize(F, self.pars.weight_scale)
+            elif self.pars.weight_init == 'bipolar':
+                F = np.array(int(p.n_neurons/2)*[self.input.n_neurons*[1.0]]+int(p.n_neurons/2)*[self.input.n_neurons*[1.0]]).T
+            else:
+                raise ValueError('Incorrect weight initalisation option specified.')
+            
+            F = normalize(F, self.pars.weight_scale)
+            p.inp_dim = self.input.n_neurons
             p.addConnection(self.pars, node=self.input, weights=F, learning_rule=self.pars.learning_rule_fwd)
 
             #add recurrent connections
@@ -47,19 +50,22 @@ class SCN:
         for pop in self.populations:
             pop.initialise(self.steps)
 
-    def step(self, iter, record_data):
+    def step(self, iter, learning):
         self.input.step(iter, self.timestep)
 
         for pop in self.populations:
-            pop.step(iter, self.timestep)
-            #inp.propogate(self.iter, self.timestep)
+            pop.step(iter, self.timestep, learning)
 
-            if record_data:
-                data = pop.get_data()
-
-    def __call__(self, record_data=False):
+    
+    def __call__(self, learning=True):
         self.initialise()
 
         for i in range(self.steps):
-            self.step(i, record_data)
+            self.step(i, learning)
+
+        if len(self.populations) > 1:
+            raise NotImplementedError()
+        else:
+            return np.mean(np.linalg.norm((self.populations[0].output[:,-100:] - self.input.I[:,-100:]), axis=0))
+
 
