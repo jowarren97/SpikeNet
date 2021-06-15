@@ -53,16 +53,17 @@ def patches_params():
     params.steps = int(params.duration/params.timestep)
 
     params.learning_onset = 250 #in steps
-    params.train_its = 5000
+    params.train_its = 100000
     params.test_its = 100
-    params.test_freq = 500
+    params.test_freq = 2000
+    params.weight_save_freq = 2000
 
     params.weight_scale = 0.1
     params.weight_init = 'random'
-    params.learning_rule_rec = enforcedRec #'enforced' 
+    params.learning_rule_rec = brendel2020rec #'enforced' 
     params.learning_rule_fwd = eligibilityTraceFwd
-    params.lr_rec = 0.01 #0.01
-    params.lr_fwd = 0.001
+    params.lr_rec = 0.005 #0.01
+    params.lr_fwd = 0.0001
 
     return params
 

@@ -33,7 +33,7 @@ N = params.n_neurons
 
 print(params.weight_init)
 
-inp = ImagePatchInput('input', path='../data/test_images/', patch_size=(8,8), r=200)
+inp = ImagePatchInput('input', path='data/test_images/', patch_size=(8,8), r=200)
 net = SCN(params, inp)
 pop=net.populations[0]
 w_init = pop.fastConnections['input'].weights
